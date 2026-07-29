@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { gate } from '../content';
+import { prefetchOpening, playOpening } from '../backgroundMusic';
 
 const normalize = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 const ACCEPTED = gate.acceptedAnswers.map(normalize);
@@ -29,6 +30,12 @@ export default function PasswordGate({ onUnlock }) {
   const heartRef = useRef(null);
   const ringRefs = useRef([]);
   const floaterRefs = useRef([]);
+
+  /* Start downloading the opening song straight away, while she's still reading
+     and typing. That buys the whole duration of the password screen as a head
+     start, so the music is ready the instant she's through instead of spending
+     several seconds fetching 8.8 MB. */
+  useEffect(() => { prefetchOpening(); }, []);
 
   /* Hearts drifting upward, forever */
   useEffect(() => {
@@ -93,6 +100,12 @@ export default function PasswordGate({ onUnlock }) {
     e.preventDefault();
 
     if (ACCEPTED.includes(normalize(value))) {
+      /* Start the music HERE, synchronously inside the click handler. This is
+         the user gesture the browser requires — starting it later, after the
+         fade-out completes, is no longer attributable to a gesture and gets
+         blocked or deferred. Already-buffered, so it begins immediately. */
+      playOpening();
+
       gsap.to(gateRef.current, {
         opacity: 0,
         scale: 1.05,

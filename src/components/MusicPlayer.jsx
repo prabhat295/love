@@ -15,10 +15,18 @@ export default function MusicPlayer() {
   }), []);
 
   useEffect(() => {
-    playOpening();
+    /* Deliberately NOT calling playOpening() here.
 
-    /* Browsers refuse to autoplay audio until she interacts with the page.
-       Her first tap is the password screen, so this is invisible. */
+       On mount there has been no user gesture yet, so play() is rejected — but
+       it still sets currentKey to 'opening'. A later playOpening() from the
+       password button then sees the key unchanged and does nothing, which is
+       exactly why the opening song never started while the gallery songs did.
+
+       PasswordGate starts it instead, synchronously inside its click handler,
+       which is the gesture the browser requires. */
+
+    /* Fallback for a refresh mid-session, where the gate never appears and so
+       nothing else claims the first gesture. */
     const onFirstTouch = () => {
       unlock();
       setTitle(nowPlaying());

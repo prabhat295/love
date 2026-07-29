@@ -156,7 +156,9 @@ export function playFor(key) {
    openingSong — by default nothing plays until she opens a photo. */
 export function unlock() {
   if (started || mutedByUser || !openingSong) return;
-  playFor(openingSong);
+  /* playOpening, not playFor: if an earlier blocked attempt already set
+     currentKey to 'opening', playFor would see no change and do nothing. */
+  playOpening();
 }
 
 export function toggleMute() {
@@ -189,13 +191,19 @@ export function toggleMute() {
 export function playOpening() {
   if (!openingSong) { stopAll(); return; }
 
-  /* If it's already the current track but paused — which is what a gallery
-     song leaves behind — playFor() would see no change and do nothing, so
-     nudge it back to life directly. */
-  const el = tracks.get(openingSong);
-  if (currentKey === openingSong && el?.paused && !mutedByUser) {
-    const target = config(openingSong)?.volume ?? 0.5;
-    el.play().then(() => { fadeTo(el, target, 900); notify(); }).catch(() => {});
+  /* If 'opening' is already the current key but silent, playFor() would see no
+     change and do nothing. Two ways to end up here: a gallery song paused it,
+     or an autoplay-blocked play() set the key without ever starting. Either
+     way, start it directly.
+
+     audioFor rather than tracks.get, so this also works the first time, before
+     any Audio object exists. */
+  if (currentKey === openingSong && !mutedByUser) {
+    const el = audioFor(openingSong);
+    if (el?.paused) {
+      const target = config(openingSong)?.volume ?? 0.5;
+      el.play().then(() => { started = true; fadeTo(el, target, 900); notify(); }).catch(() => {});
+    }
     return;
   }
 
@@ -212,6 +220,39 @@ export function prefetchAll() {
   for (const s of soundtrack) {
     if (s.file) audioFor(s.for);
   }
+}
+
+/* Downloads ONLY the opening song, and waits until enough of it has buffered
+   to play without stalling.
+
+   Called while the password screen is still up. Creating the Audio object is
+   what starts the fetch — by the time she's typed "i love you" and pressed the
+   button, several seconds of audio are already in memory, so playback is
+   instant instead of waiting on an 8.8 MB download.
+
+   Resolves on `canplay` rather than the full download: a few seconds buffered
+   is enough, and waiting for all of it would defeat the point. */
+export function prefetchOpening() {
+  if (!openingSong) return Promise.resolve();
+
+  const el = audioFor(openingSong);
+  if (!el) return Promise.resolve();
+
+  /* readyState >= 3 (HAVE_FUTURE_DATA) means it can start without stalling */
+  if (el.readyState >= 3) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const done = () => {
+      el.removeEventListener('canplay', done);
+      el.removeEventListener('error', done);
+      resolve();
+    };
+    el.addEventListener('canplay', done);
+    el.addEventListener('error', done);
+    /* Never block the unlock on a slow network */
+    setTimeout(done, 8000);
+    el.load();
+  });
 }
 
 /* Stops everything. Used when she closes a photo — the song belongs to the
