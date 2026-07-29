@@ -64,7 +64,7 @@ export const welcome = {
   heading: 'Sirf Aapke Liye 👑',
   caption: 'Meri Shivani ❤️',
   poem: [
-    'Ek ladki thi — Shivani Priya.',
+    'Ek ladki hai — Shivani Priya.',
     '',
     'Jiski muskaan dekhkar dil dhadakna bhool jaaye,',
     'Jiski ek jhalak kaafi hai poora din bana dene ke liye.',

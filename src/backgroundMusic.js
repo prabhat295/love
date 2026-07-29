@@ -18,18 +18,22 @@ let started = false;        // has playback ever been allowed by the browser
 
 const config = (key) => soundtrack.find((s) => s.for === key);
 
-/* Works out where a song actually lives. `file` may be a plain filename in
-   public/songs/, any full URL, or a Google Drive share link — Drive's
-   /file/d/<id>/view page can't be played directly, so pull the ID out and
-   rewrite it to the endpoint that serves the bytes. */
+/* Works out where a song actually lives. `file` may be a filename in
+   public/songs/, any direct audio URL, or a Google Drive share link.
+
+   Drive links get routed through /api/song rather than pointed at Drive
+   directly. Drive answers browser media requests — the ones that carry an
+   `Origin` header — with 403 Forbidden, so <audio src="drive.google.com/...">
+   never plays. Fetching it server-side and re-serving from our own origin is
+   what makes it work. See api/song.js. */
 export function songUrl(file) {
   if (!file) return '';
 
   if (/^https?:\/\//i.test(file)) {
     const driveId = file.match(/\/file\/d\/([a-zA-Z0-9_-]{25,})/)?.[1]
                  || file.match(/[?&]id=([a-zA-Z0-9_-]{25,})/)?.[1];
-    if (driveId) return `https://drive.google.com/uc?export=download&id=${driveId}`;
-    return file;
+    if (driveId) return `/api/song?id=${driveId}`;
+    return file;   // some other host — assume it sends proper CORS headers
   }
 
   return publicUrl(`songs/${file}`);
