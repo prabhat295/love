@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useSectionReveal } from '../hooks/useGSAPAnimations';
 import SectionHeader from './SectionHeader';
 import EmptySlot from './EmptySlot';
+import FloatingHearts from './FloatingHearts';
 import { gallery } from '../content';
 import { photos as allPhotos } from '../media';
 import { playFor } from '../backgroundMusic';
@@ -13,16 +14,22 @@ gsap.registerPlugin(ScrollTrigger);
 /* How many show in the grid before the "see more" button */
 const VISIBLE_COUNT = 7;
 
+/* Seconds each photo stays up in the slideshow */
+const SLIDE_SECONDS = 3;
+
 function Lightbox({ photos, startIndex, onClose }) {
   const [current, setCurrent] = useState(startIndex);
+  const [playing, setPlaying] = useState(true);   // slideshow runs by default
+  const imgRef = useRef(null);
 
   const prev = useCallback(() => setCurrent((c) => (c - 1 + photos.length) % photos.length), [photos.length]);
   const next = useCallback(() => setCurrent((c) => (c + 1) % photos.length), [photos.length]);
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'ArrowLeft') prev();
-      else if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft') { setPlaying(false); prev(); }
+      else if (e.key === 'ArrowRight') { setPlaying(false); next(); }
+      else if (e.key === ' ') { e.preventDefault(); setPlaying((p) => !p); }
       else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
@@ -32,6 +39,33 @@ function Lightbox({ photos, startIndex, onClose }) {
       document.body.style.overflow = '';
     };
   }, [prev, next, onClose]);
+
+  /* Advance every SLIDE_SECONDS. The interval is keyed on `current` as well as
+     `playing`, so tapping an arrow restarts the countdown rather than leaving a
+     photo up for a fraction of a second. */
+  useEffect(() => {
+    if (!playing || photos.length < 2) return;
+    const t = setTimeout(next, SLIDE_SECONDS * 1000);
+    return () => clearTimeout(t);
+  }, [playing, current, next, photos.length]);
+
+  /* Cross-fade and drift each photo in, so the slideshow glides rather than
+     cutting. Re-runs on every change of `current`. */
+  useEffect(() => {
+    if (!imgRef.current) return;
+    const tween = gsap.fromTo(
+      imgRef.current,
+      { opacity: 0, scale: 1.06 },
+      { opacity: 1, scale: 1, duration: 1.1, ease: 'power2.out' }
+    );
+    return () => tween.kill();
+  }, [current]);
+
+  /* Preload the next photo so the fade never lands on a blank frame */
+  useEffect(() => {
+    const upcoming = photos[(current + 1) % photos.length];
+    if (upcoming) { const img = new Image(); img.src = upcoming.full; }
+  }, [current, photos]);
 
   /* Swipe left/right on a phone */
   const touchStartX = useRef(null);
@@ -54,46 +88,94 @@ function Lightbox({ photos, startIndex, onClose }) {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
+      {/* Hearts drifting up behind the photo */}
+      <FloatingHearts count={12} opacity={0.4} />
+
       <button
         onClick={onClose}
         aria-label="Band kijiye"
-        className="absolute top-5 right-6 text-white/70 hover:text-white text-3xl font-light leading-none"
+        className="absolute top-5 right-6 z-20 text-white/70 hover:text-white text-3xl font-light leading-none"
       >
         ×
       </button>
 
-      <p className="absolute top-5 left-6 text-white/50 text-sm" style={{ fontFamily: "'Lato', sans-serif" }}>
+      <p className="absolute top-5 left-6 z-20 text-white/50 text-sm" style={{ fontFamily: "'Lato', sans-serif" }}>
         {current + 1} / {photos.length}
       </p>
 
-      <div className="relative flex items-center justify-center w-full px-4 md:px-16" style={{ maxHeight: '75vh' }}>
+      {/* Play / pause, with a ring that drains over the 3 seconds */}
+      {photos.length > 1 && (
         <button
-          onClick={prev}
+          onClick={() => setPlaying((p) => !p)}
+          aria-label={playing ? 'Slideshow roken' : 'Slideshow chalayein'}
+          title={playing ? 'Pause' : 'Play'}
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-110"
+          style={{
+            background: 'rgba(0,21,34,0.75)',
+            border: '1px solid rgba(251,82,72,0.45)',
+            backdropFilter: 'blur(10px)',
+            color: 'rgba(255,255,255,0.85)',
+            fontSize: 13,
+          }}
+        >
+          {playing && (
+            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 44 44">
+              {/* key={current} restarts the CSS animation on every slide */}
+              <circle
+                key={current}
+                cx="22" cy="22" r="20"
+                fill="none" stroke="#FB5248" strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray="125.6"
+                style={{ animation: `drain ${SLIDE_SECONDS}s linear` }}
+              />
+            </svg>
+          )}
+          <span className="relative">{playing ? '❚❚' : '▶'}</span>
+        </button>
+      )}
+
+      <style>{`
+        @keyframes drain {
+          from { stroke-dashoffset: 0; }
+          to   { stroke-dashoffset: 125.6; }
+        }
+      `}</style>
+
+      <div className="relative z-10 flex items-center justify-center w-full px-4 md:px-16" style={{ maxHeight: '75vh' }}>
+        {/* Using an arrow means she's steering, so stop auto-advancing */}
+        <button
+          onClick={() => { setPlaying(false); prev(); }}
           aria-label="Pichhla"
-          className="absolute left-1 md:left-4 text-white/60 hover:text-white text-4xl select-none px-2"
+          className="absolute left-1 md:left-4 z-20 text-white/60 hover:text-white text-4xl select-none px-2"
         >
           ‹
         </button>
 
-        {/* `full` is the high-res version; the grid uses the smaller `src` */}
+        {/* `full` is the high-res version; the grid uses the smaller `src`.
+            No `key` here — remounting would kill the cross-fade tween. */}
         <img
-          key={photo.id}
+          ref={imgRef}
           src={photo.full}
           alt={photo.label}
-          className="rounded-xl object-contain shadow-2xl"
-          style={{ maxHeight: '72vh', maxWidth: '80vw' }}
+          className="rounded-xl object-contain"
+          style={{
+            maxHeight: '72vh',
+            maxWidth: '80vw',
+            boxShadow: '0 0 70px rgba(193,18,31,0.25), 0 24px 70px rgba(0,0,0,0.7)',
+          }}
         />
 
         <button
-          onClick={next}
+          onClick={() => { setPlaying(false); next(); }}
           aria-label="Agla"
-          className="absolute right-1 md:right-4 text-white/60 hover:text-white text-4xl select-none px-2"
+          className="absolute right-1 md:right-4 z-20 text-white/60 hover:text-white text-4xl select-none px-2"
         >
           ›
         </button>
       </div>
 
-      <div className="mt-4 text-center px-4">
+      <div className="relative z-10 mt-4 text-center px-4">
         <span
           className="text-xs tracking-widest uppercase px-3 py-1 rounded-full mr-2"
           style={{
@@ -110,11 +192,11 @@ function Lightbox({ photos, startIndex, onClose }) {
         </span>
       </div>
 
-      <div className="flex gap-2 mt-5 overflow-x-auto px-4 pb-1" style={{ maxWidth: '90vw' }}>
+      <div className="relative z-10 flex gap-2 mt-5 overflow-x-auto px-4 pb-1" style={{ maxWidth: '90vw' }}>
         {photos.map((thumb, i) => (
           <button
             key={thumb.id}
-            onClick={() => setCurrent(i)}
+            onClick={() => { setPlaying(false); setCurrent(i); }}
             aria-label={thumb.label}
             className="flex-shrink-0 rounded-lg overflow-hidden transition-all duration-200"
             style={{
