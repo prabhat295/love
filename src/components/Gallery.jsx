@@ -8,19 +8,24 @@ import FloatingHearts from './FloatingHearts';
 import useScrollLock from '../useScrollLock';
 import { gallery } from '../content';
 import { photos as allPhotos } from '../media';
-import { playFor, stopAll } from '../backgroundMusic';
+import { playFor, playOpening } from '../backgroundMusic';
 
 gsap.registerPlugin(ScrollTrigger);
 
 /* How many show in the grid before the "see more" button */
 const VISIBLE_COUNT = 7;
 
-/* Seconds each photo stays up in the slideshow */
+/* Seconds each photo stays up in the slideshow. The first gets longer so the
+   song has time to come in — she opens a photo and the music starts, and
+   moving on after 3s would mean the first photo is gone before the song is
+   really audible. */
+const FIRST_SLIDE_SECONDS = 6;
 const SLIDE_SECONDS = 3;
 
 function Lightbox({ photos, startIndex, onClose }) {
   const [current, setCurrent] = useState(startIndex);
   const [playing, setPlaying] = useState(true);   // slideshow runs by default
+  const [slideCount, setSlideCount] = useState(0); // how many have auto-advanced
   const imgRef = useRef(null);
 
   const prev = useCallback(() => setCurrent((c) => (c - 1 + photos.length) % photos.length), [photos.length]);
@@ -41,14 +46,21 @@ function Lightbox({ photos, startIndex, onClose }) {
      body{overflow:hidden} alone isn't enough, especially on iOS. */
   useScrollLock(true);
 
-  /* Advance every SLIDE_SECONDS. The interval is keyed on `current` as well as
-     `playing`, so tapping an arrow restarts the countdown rather than leaving a
-     photo up for a fraction of a second. */
+  /* How long the photo currently on screen stays up. `slideCount` is 0 only for
+     the very first photo of this viewing, so the longer pause happens once —
+     not every time she lands back on whichever photo she started from. */
+  const seconds = slideCount === 0 ? FIRST_SLIDE_SECONDS : SLIDE_SECONDS;
+
+  /* Advance on a timer keyed to `current`, so tapping an arrow restarts the
+     countdown rather than leaving a photo up for a fraction of a second. */
   useEffect(() => {
     if (!playing || photos.length < 2) return;
-    const t = setTimeout(next, SLIDE_SECONDS * 1000);
+    const t = setTimeout(() => {
+      setSlideCount((n) => n + 1);
+      next();
+    }, seconds * 1000);
     return () => clearTimeout(t);
-  }, [playing, current, next, photos.length]);
+  }, [playing, current, next, photos.length, seconds]);
 
   /* Cross-fade and drift each photo in, so the slideshow glides rather than
      cutting. Re-runs on every change of `current`. */
@@ -128,7 +140,7 @@ function Lightbox({ photos, startIndex, onClose }) {
                 fill="none" stroke="#FB5248" strokeWidth="2"
                 strokeLinecap="round"
                 strokeDasharray="125.6"
-                style={{ animation: `drain ${SLIDE_SECONDS}s linear` }}
+                style={{ animation: `drain ${seconds}s linear` }}
               />
             </svg>
           )}
@@ -317,11 +329,11 @@ export default function Gallery({
     if (songKey) playFor(songKey);
   }, [songKey]);
 
-  /* The song goes with the slideshow — closing the photo should end both,
-     rather than leaving music playing over a page with no photos on it. */
+  /* Closing a photo hands the music back to the opening song, rather than
+     leaving the gallery's track playing over a page with no photos on it. */
   const closeLightbox = useCallback(() => {
     setLightboxIndex(null);
-    if (songKey) stopAll();
+    if (songKey) playOpening();
   }, [songKey]);
 
   const visible = photos.slice(0, VISIBLE_COUNT);

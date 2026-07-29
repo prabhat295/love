@@ -184,9 +184,22 @@ export function toggleMute() {
   return mutedByUser;
 }
 
-/* Kept for App/MusicPlayer to call on mount — a no-op unless openingSong is set */
+/* The song for the page itself, outside any photo section. Also what the
+   music returns to when she closes a photo. */
 export function playOpening() {
-  if (openingSong) playFor(openingSong);
+  if (!openingSong) { stopAll(); return; }
+
+  /* If it's already the current track but paused — which is what a gallery
+     song leaves behind — playFor() would see no change and do nothing, so
+     nudge it back to life directly. */
+  const el = tracks.get(openingSong);
+  if (currentKey === openingSong && el?.paused && !mutedByUser) {
+    const target = config(openingSong)?.volume ?? 0.5;
+    el.play().then(() => { fadeTo(el, target, 900); notify(); }).catch(() => {});
+    return;
+  }
+
+  playFor(openingSong);
 }
 
 /* Creates the Audio objects up front so the browser starts downloading before

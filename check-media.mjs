@@ -31,12 +31,20 @@ for (const s of soundtrack) {
       const type = res.headers.get('content-type') || '';
       const mb = ((+res.headers.get('content-length') || 0) / 1048576).toFixed(1);
 
-      if (res.ok && type.startsWith('audio/')) {
-        ok(`${s.for.padEnd(11)} ${s.title} — ${type}, ${mb} MB`);
+      /* Drive labels some mp3s application/octet-stream. That's a real audio
+         payload, just untyped — api/song.js relabels it as audio/mpeg. Only
+         text/html means an actual failure (Drive's download-warning page). */
+      const isHtml = type.includes('text/html');
+
+      if (res.ok && !isHtml) {
+        const note = type.startsWith('audio/') ? type : `${type} → sent as audio/mpeg`;
+        ok(`${s.for.padEnd(11)} ${s.title} — ${note}, ${mb} MB`);
       } else {
         problems++;
-        no(`${s.for.padEnd(11)} ${s.title} — served "${type}", not audio`);
-        info(driveId ? 'is the file shared as "Anyone with the link"?' : url);
+        no(`${s.for.padEnd(11)} ${s.title} — served "${type}"`);
+        info(driveId
+          ? 'check the file is shared as "Anyone with the link"'
+          : url);
       }
     } catch (e) {
       problems++;

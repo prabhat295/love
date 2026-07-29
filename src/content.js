@@ -555,6 +555,14 @@ export const soundtrack = [
     volume: 0.5,
   },
   {
+    for: 'opening',
+    /* "Aane Se Uske Aaye Bahar" — from Jeene Ki Raah (1969),
+       Mohammed Rafi. Plays the moment she's past the password. */
+    file: 'https://drive.google.com/file/d/1WsMhXOfhCTABDioGBtzUDgxXjmqDVkjK/view',
+    title: 'Aane Se Uske Aaye Bahar',
+    volume: 0.5,
+  },
+  {
     for: 'video',
     file: '',          // deliberately silent — your video has its own audio
     title: '',
@@ -562,6 +570,6 @@ export const soundtrack = [
   },
 ];
 
-/* Nothing plays until she opens a photo. Set this to 'us' or 'engagement'
-   if you'd rather a song started the moment she gets past the password. */
-export const openingSong = '';
+/* Plays as soon as she enters the password — before she reaches any photos.
+   Set to '' for silence until she opens a photo.                         */
+export const openingSong = 'opening';

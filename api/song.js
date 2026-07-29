@@ -19,6 +19,7 @@
 const ALLOWED = new Set([
   '14OUHVAc3nX2PaudJqGDcpYBV5kO1f2Eo', // Tujhe Na Dekhu Toh Chain
   '1utqG8fzYroHJzzlv3gzkj0R-JXwjIK3i', // Janam Janam Jo Saath Nibhaye
+  '1WsMhXOfhCTABDioGBtzUDgxXjmqDVkjK', // Aane Se Uske Aaye Bahar
 ]);
 
 export default async function handler(req, res) {
@@ -45,15 +46,20 @@ export default async function handler(req, res) {
     }
 
     const type = upstream.headers.get('content-type') || '';
-    /* Drive shows an HTML virus-scan page for very large files — that would
-       arrive as text/html and the browser would fail to decode it as audio. */
-    if (!type.startsWith('audio/')) {
+
+    /* Drive shows an HTML virus-scan page for some files — that would arrive as
+       text/html and the browser would fail to decode it as audio. Reject only
+       HTML: Drive labels some mp3s application/octet-stream, which is a real
+       audio payload that just isn't typed usefully. */
+    if (type.includes('text/html')) {
       res.statusCode = 502;
-      return res.end(`Drive served "${type}" instead of audio`);
+      return res.end('Drive served its download-warning page instead of the file');
     }
 
     res.statusCode = upstream.status;
-    res.setHeader('Content-Type', type);
+    /* Always announce audio/mpeg. An octet-stream Content-Type makes some
+       browsers refuse to decode the response as playable media. */
+    res.setHeader('Content-Type', type.startsWith('audio/') ? type : 'audio/mpeg');
     res.setHeader('Accept-Ranges', 'bytes');
     /* A day of browser caching, a week on Vercel's CDN — the songs never
        change, so there's no reason to re-fetch them from Drive. */
