@@ -19,6 +19,32 @@ const songFiles = existsSync(songDir)
 for (const s of soundtrack) {
   if (!s.file) { info(`"${s.for}" section is silent on purpose`); continue; }
 
+  /* A full URL is hosted elsewhere — check it actually serves audio */
+  if (/^https?:\/\//i.test(s.file)) {
+    const driveId = s.file.match(/\/file\/d\/([a-zA-Z0-9_-]{25,})/)?.[1];
+    const url = driveId
+      ? `https://drive.google.com/uc?export=download&id=${driveId}`
+      : s.file;
+
+    try {
+      const res = await fetch(url, { redirect: 'follow' });
+      const type = res.headers.get('content-type') || '';
+      const mb = ((+res.headers.get('content-length') || 0) / 1048576).toFixed(1);
+
+      if (res.ok && type.startsWith('audio/')) {
+        ok(`${s.for.padEnd(11)} ${s.title} — ${type}, ${mb} MB`);
+      } else {
+        problems++;
+        no(`${s.for.padEnd(11)} ${s.title} — served "${type}", not audio`);
+        info(driveId ? 'is the file shared as "Anyone with the link"?' : url);
+      }
+    } catch (e) {
+      problems++;
+      no(`${s.for.padEnd(11)} ${s.title} — could not reach it (${e.message})`);
+    }
+    continue;
+  }
+
   if (songFiles.includes(s.file)) {
     ok(`${s.for.padEnd(11)} ${s.file}`);
   } else {
@@ -28,8 +54,11 @@ for (const s of soundtrack) {
   }
 }
 
-/* Files sitting there unused — usually a filename typo, so worth pointing out */
-const wanted = soundtrack.map((s) => s.file).filter(Boolean);
+/* Files sitting there unused — usually a filename typo, so worth pointing out.
+   URLs are excluded; they're not meant to be in public/songs/. */
+const wanted = soundtrack
+  .map((s) => s.file)
+  .filter((f) => f && !/^https?:\/\//i.test(f));
 const stray = songFiles.filter((f) => !wanted.includes(f));
 if (stray.length) {
   console.log('');

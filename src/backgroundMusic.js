@@ -18,12 +18,29 @@ let started = false;        // has playback ever been allowed by the browser
 
 const config = (key) => soundtrack.find((s) => s.for === key);
 
+/* Works out where a song actually lives. `file` may be a plain filename in
+   public/songs/, any full URL, or a Google Drive share link — Drive's
+   /file/d/<id>/view page can't be played directly, so pull the ID out and
+   rewrite it to the endpoint that serves the bytes. */
+export function songUrl(file) {
+  if (!file) return '';
+
+  if (/^https?:\/\//i.test(file)) {
+    const driveId = file.match(/\/file\/d\/([a-zA-Z0-9_-]{25,})/)?.[1]
+                 || file.match(/[?&]id=([a-zA-Z0-9_-]{25,})/)?.[1];
+    if (driveId) return `https://drive.google.com/uc?export=download&id=${driveId}`;
+    return file;
+  }
+
+  return publicUrl(`songs/${file}`);
+}
+
 function audioFor(key) {
   const cfg = config(key);
   if (!cfg?.file || failed.has(key)) return null;
 
   if (!tracks.has(key)) {
-    const src = publicUrl(`songs/${cfg.file}`);
+    const src = songUrl(cfg.file);
     const el = new Audio(src);
     el.loop = true;
     el.volume = 0;                       // always fade in, never start at full
@@ -31,11 +48,17 @@ function audioFor(key) {
       failed.add(key);
       tracks.delete(key);
       /* Silent failure is what made this so confusing to debug — say it out
-         loud in the console so it's obvious the file just isn't there. */
+         loud in the console so the cause is obvious. */
+      const isUrl = /^https?:\/\//i.test(cfg.file);
       console.warn(
-        `[music] Could not load "${cfg.file}" for the "${key}" section.\n` +
-        `  Expected it at: public/songs/${cfg.file}\n` +
-        `  Either put that file there, or change the filename in src/content.js → soundtrack.`
+        `[music] Could not load the song for the "${key}" section.\n` +
+        `  Tried: ${src}\n` +
+        (isUrl
+          ? '  If this is a Google Drive link, check the file is shared as\n' +
+            '  "Anyone with the link". Very large files can also hit Drive\'s\n' +
+            '  virus-scan page, which returns HTML instead of audio.'
+          : `  Put the file at public/songs/${cfg.file}, or fix the name in\n` +
+            '  src/content.js → soundtrack.')
       );
       notify();
     });

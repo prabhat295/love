@@ -518,8 +518,12 @@ export const finale = {
 /* ── 12. MUSIC ────────────────────────────────────────────────────────
    A different song for each photo group, and silence during the video.
 
-   Put your .mp3 files into public/songs/ and write the exact filenames
-   below. Leave a `file` empty ('') and that group simply plays nothing.
+   Each song's `file` can be EITHER:
+     • a filename in public/songs/  e.g. 'janam-janam.mp3'
+     • a full URL                   e.g. 'https://.../song.mp3'
+       (a Google Drive share link works — it gets converted automatically)
+
+   Leave a `file` empty ('') and that section simply plays nothing.
 
    How it behaves:
    • The song changes as she scrolls between the two photo sections,
@@ -538,7 +542,7 @@ export const soundtrack = [
     /* "Tujhe Na Dekhu Toh Chain" — from Rang (1993),
        Kumar Sanu & Alka Yagnik. Same film as "Tumhein Dekhen Meri
        Aankhen", which is a different song — don't mix them up. */
-    file: 'tujhe-na-dekhu-toh-chain.mp3',
+    file: 'https://drive.google.com/file/d/14OUHVAc3nX2PaudJqGDcpYBV5kO1f2Eo/view',
     title: 'Tujhe Na Dekhu Toh Chain',
     volume: 0.5,
   },
@@ -546,7 +550,7 @@ export const soundtrack = [
     for: 'engagement',
     /* "Janam Janam Jo Saath Nibhaye" — from Raja Bhaiya (2003),
        Udit Narayan & Alka Yagnik. NOT the Dilwale song of a similar name. */
-    file: 'janam-janam-jo-saath-nibhaye.mp3',
+    file: 'https://drive.google.com/file/d/1utqG8fzYroHJzzlv3gzkj0R-JXwjIK3i/view',
     title: 'Janam Janam Jo Saath Nibhaye',
     volume: 0.5,
   },
