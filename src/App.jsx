@@ -13,7 +13,8 @@ import ScrollToTop from './components/ScrollToTop';
 import MusicPlayer from './components/MusicPlayer';
 import SoundtrackZone from './components/SoundtrackZone';
 import { gallery, galleryEngagement } from './content';
-import { isUnlocked, unlock, lock, watch } from './session';
+import { isUnlocked, unlock, watch } from './session';
+import { prefetchAll } from './backgroundMusic';
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(isUnlocked);
@@ -22,7 +23,16 @@ export default function App() {
   const handleUnlock = () => {
     unlock();
     setUnlocked(true);
+    /* Start downloading both songs now. The larger one is 13 MB, and without
+       this head start it spends the first few seconds of the slideshow
+       buffering — by which point she's already on the third photo. */
+    prefetchAll();
   };
+
+  /* Covers a refresh mid-session, where handleUnlock never runs */
+  useEffect(() => {
+    if (unlocked) prefetchAll();
+  }, [unlocked]);
 
   /* Send her back to the password screen once the session times out. */
   useEffect(() => {

@@ -48,7 +48,7 @@ export const session = {
 
 /* ── 3. THE FIRST SCREEN (typed out letter by letter) ──────────────── */
 export const hero = {
-  preTitle: 'I Love You',
+  preTitle: 'I Love You Jaan',
   title: 'Meri Shivani',
   titleEmoji: '❤️',
   subtitle: 'Kuch baatein hain jo main aapse kehna chahta tha.',

@@ -48,6 +48,10 @@ function audioFor(key) {
     const el = new Audio(src);
     el.loop = true;
     el.volume = 0;                       // always fade in, never start at full
+    /* Start fetching immediately rather than on first play(). Without this the
+       13 MB track spends a couple of seconds buffering after she clicks, by
+       which point the slideshow is already on the third photo. */
+    el.preload = 'auto';
     el.addEventListener('error', () => {
       failed.add(key);
       tracks.delete(key);
@@ -183,4 +187,28 @@ export function toggleMute() {
 /* Kept for App/MusicPlayer to call on mount — a no-op unless openingSong is set */
 export function playOpening() {
   if (openingSong) playFor(openingSong);
+}
+
+/* Creates the Audio objects up front so the browser starts downloading before
+   she clicks anything. Building the object is enough — preload='auto' does the
+   rest, and nothing plays until playFor() is called.
+
+   Called once she's through the password screen, which buys several seconds of
+   head start on a 13 MB track. */
+export function prefetchAll() {
+  for (const s of soundtrack) {
+    if (s.file) audioFor(s.for);
+  }
+}
+
+/* Stops everything. Used when she closes a photo — the song belongs to the
+   slideshow, so it shouldn't outlive it. */
+export function stopAll() {
+  currentKey = null;
+  for (const el of tracks.values()) {
+    if (!el.paused) {
+      fadeTo(el, 0, 600, () => { el.pause(); el.currentTime = 0; });
+    }
+  }
+  notify();
 }

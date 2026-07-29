@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { welcome } from '../content';
 import { welcomePhoto } from '../media';
+import useScrollLock from '../useScrollLock';
 
 const BG_HEARTS = Array.from({ length: 12 }, (_, i) => ({
   id: i,
@@ -20,11 +21,18 @@ export default function WelcomePopup({ onClose }) {
   const imgRef = useRef(null);
   const cursorRef = useRef(null);
   const [showImage, setShowImage] = useState(false);
+  /* The poem types itself out; she can't dismiss it until it's finished. */
+  const [finished, setFinished] = useState(false);
 
-  /* Type the poem out word by word */
+  /* Nothing behind this scrolls while it's open */
+  useScrollLock(true);
+
+  /* Type the poem out word by word. Bails out if `finished` flips early,
+     which is what the skip-on-tap does — otherwise the interval would keep
+     writing over the completed text. */
   useEffect(() => {
     const el = textRef.current;
-    if (!el) return;
+    if (!el || finished) return;
 
     const words = welcome.poem.join('\n').split(/(\s+)/); // keeps the spaces
     let text = '';
@@ -39,6 +47,7 @@ export default function WelcomePopup({ onClose }) {
         clearInterval(interval);
         cursorTl.kill();
         gsap.set(cursorRef.current, { opacity: 0 });
+        setFinished(true);
         setTimeout(() => setShowImage(true), 300);
         return;
       }
@@ -54,7 +63,7 @@ export default function WelcomePopup({ onClose }) {
       clearInterval(interval);
       cursorTl.kill();
     };
-  }, []);
+  }, [finished]);
 
   useEffect(() => {
     if (showImage && imgRef.current) {
@@ -78,16 +87,29 @@ export default function WelcomePopup({ onClose }) {
     return () => ctx.revert();
   }, []);
 
-  /* Escape closes it too */
+  /* Escape closes it — but only once the poem has finished */
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') handleClose(); };
+    const onKey = (e) => { if (e.key === 'Escape' && finished) handleClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [finished]);
 
   const handleClose = () => {
+    if (!finished) return;
     gsap.to(overlayRef.current, { opacity: 0, duration: 0.4, ease: 'power2.in', onComplete: onClose });
+  };
+
+  /* Lets her skip ahead rather than trapping her: tapping while it types
+     finishes the poem instantly instead of doing nothing. */
+  const skipTyping = () => {
+    if (finished || !textRef.current) return;
+    textRef.current.innerHTML = welcome.poem
+      .map((line) => `<span>${line || '&nbsp;'}</span>`)
+      .join('<br/>');
+    gsap.set(cursorRef.current, { opacity: 0 });
+    setFinished(true);
+    setShowImage(true);
   };
 
   return (
@@ -111,7 +133,11 @@ export default function WelcomePopup({ onClose }) {
         ref={overlayRef}
         className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
         style={{ background: 'rgba(0, 8, 18, 0.88)', backdropFilter: 'blur(6px)', opacity: 0 }}
-        onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+        onClick={(e) => {
+          if (e.target !== e.currentTarget) return;
+          /* While typing, a backdrop tap skips to the end instead of closing */
+          if (finished) handleClose(); else skipTyping();
+        }}
       >
         {BG_HEARTS.map((h) => (
           <span key={h.id} className="absolute select-none pointer-events-none" style={h}>♥</span>
@@ -135,13 +161,22 @@ export default function WelcomePopup({ onClose }) {
             style={{ background: 'linear-gradient(90deg, transparent 0%, #FB5248 50%, transparent 100%)' }}
           />
 
+          {/* Hidden until the poem finishes — she should read it, not skip it.
+              Tapping the card while it types jumps to the end instead. */}
           <button
-            onClick={handleClose}
-            aria-label="Band kijiye"
-            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full text-white/40 hover:text-white transition-colors duration-200"
-            style={{ background: 'rgba(255,255,255,0.06)', fontSize: '16px' }}
+            onClick={finished ? handleClose : skipTyping}
+            aria-label={finished ? 'Band kijiye' : 'Poora dikhaiye'}
+            title={finished ? 'Band kijiye' : 'Poora dikhaiye'}
+            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-500"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              fontSize: '16px',
+              color: finished ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.18)',
+              opacity: finished ? 1 : 0.55,
+              cursor: 'pointer',
+            }}
           >
-            ✕
+            {finished ? '✕' : '⤓'}
           </button>
 
           <div className="pt-10 pb-4 px-6 md:px-12 text-center">

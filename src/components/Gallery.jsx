@@ -5,9 +5,10 @@ import { useSectionReveal } from '../hooks/useGSAPAnimations';
 import SectionHeader from './SectionHeader';
 import EmptySlot from './EmptySlot';
 import FloatingHearts from './FloatingHearts';
+import useScrollLock from '../useScrollLock';
 import { gallery } from '../content';
 import { photos as allPhotos } from '../media';
-import { playFor } from '../backgroundMusic';
+import { playFor, stopAll } from '../backgroundMusic';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -33,12 +34,12 @@ function Lightbox({ photos, startIndex, onClose }) {
       else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [prev, next, onClose]);
+
+  /* Freeze the page behind the lightbox — see useScrollLock for why
+     body{overflow:hidden} alone isn't enough, especially on iOS. */
+  useScrollLock(true);
 
   /* Advance every SLIDE_SECONDS. The interval is keyed on `current` as well as
      `playing`, so tapping an arrow restarts the countdown rather than leaving a
@@ -316,7 +317,12 @@ export default function Gallery({
     if (songKey) playFor(songKey);
   }, [songKey]);
 
-  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+  /* The song goes with the slideshow — closing the photo should end both,
+     rather than leaving music playing over a page with no photos on it. */
+  const closeLightbox = useCallback(() => {
+    setLightboxIndex(null);
+    if (songKey) stopAll();
+  }, [songKey]);
 
   const visible = photos.slice(0, VISIBLE_COUNT);
   const hasMore = photos.length > VISIBLE_COUNT;
