@@ -20,11 +20,15 @@
 
   html { scroll-behavior: smooth; }
 
-  /* The navbar is fixed and ~68px tall, so anything scrolled to by an #anchor
-     or scrollIntoView would slide underneath it and look like it landed in the
+  /* The navbar is fixed, so anything scrolled to by an #anchor or
+     scrollIntoView would slide underneath it and look like it landed in the
      wrong place. scroll-margin-top tells the browser to stop short by that
      much. Applies to every section, so the navbar links get it too. */
-  section[id] { scroll-margin-top: 4.5rem; }
+  section[id] { scroll-margin-top: 4rem; }
+
+  @media (min-width: 768px) {
+    section[id] { scroll-margin-top: 4.5rem; }
+  }
 
   body {
     margin: 0;
